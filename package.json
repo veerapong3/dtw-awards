@@ -9,7 +9,8 @@
     "lint": "eslint",
     "setup:google": "node scripts/setup-from-json.mjs",
     "discover:google": "node scripts/discover-google.mjs",
-    "test:google": "node scripts/test-google.mjs"
+    "test:google": "node scripts/test-google.mjs",
+    "push:github": "node scripts/github-push.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
