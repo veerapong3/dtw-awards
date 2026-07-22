@@ -134,6 +134,19 @@ export function buildSummaryRows(records: AwardRecord[]) {
   return { overview, areaRows, levelRows, yearRows, topStudents, topTeachers };
 }
 
+export function buildSummaryFlatRows(records: AwardRecord[]) {
+  const s = buildSummaryRows(records);
+  return [
+    ...s.overview.map((r) => ({ ส่วน: "ภาพรวม", ...r })),
+    ...s.areaRows.map((r) => ({ ส่วน: "ตามกลุ่มสาระ", ...r })),
+    ...s.levelRows.map((r) => ({ ส่วน: "ตามระดับ", ...r })),
+    ...s.yearRows.map((r) => ({ ส่วน: "ตามปีการศึกษา", ...r })),
+    ...s.topStudents.map((r) => ({ ส่วน: "Top นักเรียน", ...r })),
+    ...s.topTeachers.map((r) => ({ ส่วน: "Top ครู", ...r })),
+    ...buildActivityRows(records).map((r) => ({ ส่วน: "รายการกิจกรรม", ...r })),
+  ];
+}
+
 function escapeCsv(value: string | number) {
   const s = String(value ?? "");
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -142,7 +155,11 @@ function escapeCsv(value: string | number) {
 
 export function rowsToCsv(rows: Record<string, string | number>[]) {
   if (rows.length === 0) return "\uFEFFไม่มีข้อมูล";
-  const headers = Object.keys(rows[0]);
+  const headerSet = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) headerSet.add(key);
+  }
+  const headers = [...headerSet];
   const lines = [
     headers.map(escapeCsv).join(","),
     ...rows.map((row) => headers.map((h) => escapeCsv(row[h] ?? "")).join(",")),

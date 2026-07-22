@@ -6,7 +6,7 @@ import {
   buildActivityRows,
   buildFilename,
   buildStudentRows,
-  buildSummaryRows,
+  buildSummaryFlatRows,
   filterRecords,
   rowsToCsv,
   type ReportFilters,
@@ -44,14 +44,7 @@ export async function GET(request: Request) {
     let rows: Record<string, string | number>[] = [];
     if (type === "activities") rows = buildActivityRows(records);
     else if (type === "students") rows = buildStudentRows(records);
-    else {
-      const s = buildSummaryRows(records);
-      rows = [
-        ...s.overview.map((r) => ({ ประเภท: "ภาพรวม", ...r })),
-        ...s.areaRows.map((r) => ({ ประเภท: "กลุ่มสาระ", ...r })),
-        ...s.levelRows.map((r) => ({ ประเภท: "ระดับ", ...r })),
-      ];
-    }
+    else rows = buildSummaryFlatRows(records);
 
     const csv = rowsToCsv(rows);
     return new NextResponse(csv, {

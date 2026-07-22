@@ -145,7 +145,7 @@ export function ReportsPanel({ settings, totalRecords }: Props) {
 
       <div className="text-xs text-slate-400 border-t pt-3 space-y-1">
         <p>• Excel สรุปจะมีหลายชีต: ภาพรวม, ตามกลุ่มสาระ, ตามระดับ, Top นักเรียน/ครู, รายการกิจกรรม</p>
-        <p>• CSV เหมาะนำไปเปิดใน Google Sheets หรือกรองต่อ</p>
+        <p>• CSV สรุปรวมทุกส่วนในชีตเดียว (กรองคอลัมน์ &quot;ส่วน&quot; ได้) — เหมาะเปิดใน Google Sheets</p>
       </div>
     </div>
   );
