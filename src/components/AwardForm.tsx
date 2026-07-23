@@ -128,7 +128,9 @@ export function AwardForm({
       }
 
       router.refresh();
-      if (mode === "admin" && initial) {
+      if (mode === "public") {
+        setTimeout(() => router.push("/"), 800);
+      } else if (mode === "admin" && initial) {
         setTimeout(() => router.push("/admin"), 800);
       }
     } catch (err) {

@@ -92,6 +92,12 @@ const teachers: Teacher[] = [
   { teacherId: "T004", prefix: "นาย", fullName: "ไพโรจน์ ชำนาญงาน", learningArea: "การงานอาชีพ" },
 ];
 
+type MockAdminUser = { username: string; password: string; fullName: string };
+
+let adminUsers: MockAdminUser[] = [
+  { username: "admin", password: "dtw12345", fullName: "ผู้ดูแลระบบ ดอนตาลวิทยา" },
+];
+
 export const mockStore = {
   getRecords(): AwardRecord[] {
     return [...records];
@@ -110,10 +116,39 @@ export const mockStore = {
   },
 
   authenticate(username: string, password: string) {
-    if (username === "admin" && password === "dtw12345") {
-      return { username: "admin", fullName: "ผู้ดูแลระบบ ดอนตาลวิทยา" };
+    const user = adminUsers.find((item) => item.username === username);
+    if (user && user.password === password) {
+      return { username: user.username, fullName: user.fullName };
     }
     return null;
+  },
+
+  getAdminUsers() {
+    return adminUsers.map(({ username, fullName }) => ({ username, fullName }));
+  },
+
+  createAdminUser(input: { username: string; fullName: string; password: string }) {
+    if (adminUsers.some((user) => user.username === input.username)) {
+      throw new Error("ชื่อผู้ใช้นี้มีอยู่แล้ว");
+    }
+    adminUsers.push({ ...input });
+  },
+
+  updateAdminUser(input: { username: string; fullName: string; password?: string }) {
+    const user = adminUsers.find((item) => item.username === input.username);
+    if (!user) throw new Error("ไม่พบผู้ใช้ที่ต้องการแก้ไข");
+    user.fullName = input.fullName;
+    if (input.password) user.password = input.password;
+  },
+
+  deleteAdminUser(username: string, currentUsername?: string) {
+    if (username === currentUsername) {
+      throw new Error("ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่");
+    }
+    if (adminUsers.length <= 1) {
+      throw new Error("ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน");
+    }
+    adminUsers = adminUsers.filter((user) => user.username !== username);
   },
 
   async saveRecord(input: SaveAwardInput): Promise<AwardRecord> {

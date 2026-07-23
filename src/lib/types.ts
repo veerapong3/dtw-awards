@@ -51,6 +51,12 @@ export type AdminUser = {
   fullName: string;
 };
 
+export type SaveAdminUserInput = {
+  username: string;
+  fullName: string;
+  password?: string;
+};
+
 export type ImagePayload = {
   base64: string;
   name: string;

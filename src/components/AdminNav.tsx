@@ -27,6 +27,12 @@ export function AdminNav() {
           ตั้งค่าฟอร์ม
         </Link>
         <Link
+          href="/admin/users"
+          className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 text-sm"
+        >
+          ผู้ดูแลระบบ
+        </Link>
+        <Link
           href="/submit"
           className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
         >

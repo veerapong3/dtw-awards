@@ -51,12 +51,72 @@ https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit
 
 ---
 
-## ขั้นที่ 3 — แชร์โฟลเดอร์ Drive
+## ขั้นที่ 3 — โฟลเดอร์ Drive สำหรับรูปภาพ
 
-1. เปิด Google Drive → หาโฟลเดอร์ `DTW_Activity_Showcase`  
-   (ถ้ายังไม่มี ให้สร้างโฟลเดอร์ใหม่ชื่อนี้)
-2. คลิกขวา → **แชร์**
-3. แชร์ให้ email Service Account เหมือนขั้นที่ 2 (สิทธิ์ Editor)
+> **สำคัญ:** Service Account **อัปโหลดรูปใน My Drive ไม่ได้** (ไม่มี storage quota)
+
+### วิธี C — OAuth บัญชีครู (ไม่ต้อง Admin) ⭐ แนะนำถ้าไม่มี Shared Drive
+
+ใช้บัญชีครูที่เป็นเจ้าของโฟลเดอร์ (เช่น `academic@dontanwit.ac.th`) authorize ครั้งเดียว:
+
+**1. สร้าง OAuth Client ใน Google Cloud**
+
+- APIs & Services → **OAuth consent screen** → External หรือ Internal → ใส่ email ครูเป็น Test user
+- Credentials → **Create OAuth client ID** → Web application
+- Authorized redirect URI: `http://localhost:3333/oauth/callback`
+
+**2. รันสคริปต์ authorize (ครั้งเดียว)**
+
+```powershell
+npm run setup:oauth-drive -- CLIENT_ID CLIENT_SECRET
+```
+
+Login ด้วยบัญชี `academic@dontanwit.ac.th` → อนุญาต → ได้ refresh token ใน `.env.local`
+
+**3. Push ขึ้น Vercel**
+
+```powershell
+node scripts/push-vercel-env.mjs
+```
+
+**4. ทดสอบ**
+
+```powershell
+npm run test:drive-upload
+```
+
+---
+
+### วิธี A — Shared Drive (ต้องมีเมนู Shared drives + Admin)
+
+1. เปิด Google Drive → เมนูซ้าย **Shared drives** (ไดรฟ์ที่ใช้ร่วมกัน)
+2. สร้าง Shared Drive ใหม่ (ชื่ออะไรก็ได้ เช่น `DTW School Drive`)
+3. ใน Shared Drive สร้างโฟลเดอร์ `DTW_Activity_Showcase`
+4. คลิก Shared Drive → **Manage members** → เพิ่ม email Service Account  
+   สิทธิ์: **Content manager** (ผู้จัดการเนื้อหา) ขึ้นไป
+5. คัดลอก Folder ID ของ `DTW_Activity_Showcase` ใส่ `GOOGLE_DRIVE_FOLDER_ID`
+
+> ถ้าโฟลเดอร์เดิมอยู่ใน My Drive ให้ **ย้าย** เข้า Shared Drive (ลากวาง) แล้วใช้ ID ใหม่
+
+### วิธี B — Impersonate ผู้ใช้ (Google Workspace + Admin)
+
+ใช้เมื่อไม่ใช้ Shared Drive แต่มี Google Workspace Admin:
+
+1. Google Cloud → Service Account → เปิด **Domain-wide delegation**
+2. Google Admin Console → Security → API Controls → Domain-wide delegation  
+   เพิ่ม Client ID ของ Service Account + scope: `https://www.googleapis.com/auth/drive`
+3. ใส่ใน `.env.local` และ Vercel:
+   ```
+   GOOGLE_DRIVE_IMPERSONATE_EMAIL=ครู@โรงเรียน.ac.th
+   ```
+   (email จริงที่มีพื้นที่ Drive และเป็นเจ้าของ/แชร์โฟลเดอร์ให้แล้ว)
+
+### วิธีเดิม — My Drive อย่างเดียว (ใช้ไม่ได้กับอัปโหลดรูป)
+
+แชร์โฟลเดอร์ใน My Drive ให้ Service Account อ่าน/เขียน Sheet ได้ แต่ **อัปโหลดรูปจะ error** — ต้องใช้วิธี A หรือ B
+
+1. เปิด Google Drive → หาโฟลเดอร์ `DTW_Activity_Showcase`
+2. คลิกขวา → **แชร์** → email Service Account (Editor)
 
 ### หา Folder ID
 

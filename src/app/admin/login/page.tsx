@@ -69,9 +69,6 @@ export default function AdminLoginPage() {
           {busy ? "กำลังตรวจสอบ..." : "ยืนยันตัวตน"}
         </button>
       </form>
-      <p className="text-xs text-slate-400 mt-4 text-center">
-        โหมดทดสอบ: admin / dtw12345
-      </p>
     </div>
   );
 }

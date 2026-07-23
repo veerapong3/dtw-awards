@@ -1,15 +1,17 @@
 import { cacheDelete, cacheDeletePrefix, cacheGet, cacheSet } from "./cache";
 import {
-  findEventFolder,
+  deleteEventFolderForRecord,
+  findEventFolderForRecord,
   getOrCreateEventFolder,
   trashFilesByPrefix,
-  trashFolder,
   uploadImageToDrive,
 } from "./drive";
 import { getSheetId, getSheetsClient, isMockMode } from "./google";
 import { mockStore } from "./mock-store";
 import type {
   AwardRecord,
+  AdminUser,
+  SaveAdminUserInput,
   SaveAwardInput,
   SettingItem,
   Student,
@@ -197,6 +199,128 @@ export async function authenticateUser(username: string, password: string) {
   return null;
 }
 
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  if (isMockMode()) return mockStore.getAdminUsers();
+
+  const rows = await readSheet(`${SHEET_NAMES.USERS}!A2:C`);
+  return rows
+    .filter((row) => row[0])
+    .map((row) => ({
+      username: row[0],
+      fullName: row[2] || row[0],
+    }));
+}
+
+async function findUserRow(username: string) {
+  const rows = await readSheet(`${SHEET_NAMES.USERS}!A2:C`);
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === username) {
+      return { rowNumber: i + 2, row: rows[i] };
+    }
+  }
+  return null;
+}
+
+export async function createAdminUser(input: SaveAdminUserInput) {
+  const username = input.username.trim();
+  const fullName = input.fullName.trim();
+  const password = input.password?.trim() || "";
+
+  if (!username) throw new Error("กรุณาระบุชื่อผู้ใช้");
+  if (!fullName) throw new Error("กรุณาระบุชื่อ-นามสกุล");
+  if (password.length < 6) throw new Error("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+
+  if (isMockMode()) {
+    mockStore.createAdminUser({ username, fullName, password });
+    return;
+  }
+
+  if (await findUserRow(username)) {
+    throw new Error("ชื่อผู้ใช้นี้มีอยู่แล้ว");
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: getSheetId(),
+    range: `${SHEET_NAMES.USERS}!A:C`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: [[username, hash, fullName]] },
+  });
+}
+
+export async function updateAdminUser(input: SaveAdminUserInput) {
+  const username = input.username.trim();
+  const fullName = input.fullName.trim();
+  const password = input.password?.trim();
+
+  if (!username) throw new Error("กรุณาระบุชื่อผู้ใช้");
+  if (!fullName) throw new Error("กรุณาระบุชื่อ-นามสกุล");
+  if (password && password.length < 6) {
+    throw new Error("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+  }
+
+  if (isMockMode()) {
+    mockStore.updateAdminUser({ username, fullName, password });
+    return;
+  }
+
+  const found = await findUserRow(username);
+  if (!found) throw new Error("ไม่พบผู้ใช้ที่ต้องการแก้ไข");
+
+  const storedPassword = password
+    ? await bcrypt.hash(password, 10)
+    : found.row[1] || "";
+
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: getSheetId(),
+    range: `${SHEET_NAMES.USERS}!A${found.rowNumber}:C${found.rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[username, storedPassword, fullName]] },
+  });
+}
+
+export async function deleteAdminUser(username: string, currentUsername?: string) {
+  if (username === currentUsername) {
+    throw new Error("ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่");
+  }
+
+  if (isMockMode()) {
+    mockStore.deleteAdminUser(username, currentUsername);
+    return;
+  }
+
+  const rows = await readSheet(`${SHEET_NAMES.USERS}!A2:C`);
+  const activeUsers = rows.filter((row) => row[0]);
+  if (activeUsers.length <= 1) {
+    throw new Error("ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน");
+  }
+
+  const found = await findUserRow(username);
+  if (!found) throw new Error("ไม่พบผู้ใช้ที่ต้องการลบ");
+
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: getSheetId(),
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: await getSheetGid(SHEET_NAMES.USERS),
+              dimension: "ROWS",
+              startIndex: found.rowNumber - 1,
+              endIndex: found.rowNumber,
+            },
+          },
+        },
+      ],
+    },
+  });
+}
+
 async function findRecordRow(id: string) {
   const rows = await readSheet(`${SHEET_NAMES.RECORDS}!A2:O`);
   for (let i = 0; i < rows.length; i++) {
@@ -226,7 +350,7 @@ export async function saveRecord(input: SaveAwardInput) {
 
   let folderId: string | null = null;
   if (existing) {
-    folderId = await findEventFolder(existing.startDate, existing.activityName);
+    folderId = await findEventFolderForRecord(existing);
   }
   folderId = await getOrCreateEventFolder(input.startDate, input.activityName, folderId);
 
@@ -299,8 +423,7 @@ export async function deleteRecord(id: string) {
   const found = await findRecordRow(id);
   if (!found) return false;
 
-  const folderId = await findEventFolder(found.record.startDate, found.record.activityName);
-  if (folderId) await trashFolder(folderId);
+  await deleteEventFolderForRecord(found.record);
 
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: getSheetId(),

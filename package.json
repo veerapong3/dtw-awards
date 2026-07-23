@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "setup:google": "node scripts/setup-from-json.mjs",
+    "setup:oauth-drive": "node scripts/setup-oauth-drive.mjs",
     "discover:google": "node scripts/discover-google.mjs",
     "test:google": "node scripts/test-google.mjs",
+    "test:drive-upload": "node scripts/test-drive-upload.mjs",
     "push:github": "node scripts/github-push.mjs"
   },
   "dependencies": {

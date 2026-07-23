@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { AwardRecord, SystemSettings } from "@/lib/types";
-import { formatThaiDate } from "@/lib/utils";
+import { formatThaiDate, parseRecordDate } from "@/lib/utils";
 
 type Props = {
   records: AwardRecord[];
@@ -16,11 +16,13 @@ export function ShowcaseView({ records, settings }: Props) {
   const [gallery, setGallery] = useState<AwardRecord | null>(null);
 
   const filtered = useMemo(() => {
-    return records.filter((r) => {
-      if (area && r.learningArea !== area) return false;
-      if (year && r.academicYear !== year) return false;
-      return true;
-    });
+    return records
+      .filter((r) => {
+        if (area && r.learningArea !== area) return false;
+        if (year && r.academicYear !== year) return false;
+        return true;
+      })
+      .sort((a, b) => parseRecordDate(b.startDate) - parseRecordDate(a.startDate));
   }, [records, area, year]);
 
   const highLevels = settings.HighStatsLevels?.length

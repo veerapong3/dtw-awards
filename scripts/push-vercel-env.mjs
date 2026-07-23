@@ -41,15 +41,25 @@ const keys = [
   "GOOGLE_PRIVATE_KEY",
   "GOOGLE_SHEET_ID",
   "GOOGLE_DRIVE_FOLDER_ID",
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
+  "GOOGLE_OAUTH_REFRESH_TOKEN",
+  "GOOGLE_DRIVE_IMPERSONATE_EMAIL",
 ];
 
 const environments = ["production", "preview", "development"];
 
 console.log("📤 กำลังอัปโหลด env ไป Vercel...\n");
 
-for (const key of keys) {
+  for (const key of keys) {
   const value = env[key];
   if (!value) {
+    if (
+      key === "GOOGLE_DRIVE_IMPERSONATE_EMAIL" ||
+      key.startsWith("GOOGLE_OAUTH_")
+    ) {
+      continue;
+    }
     console.warn(`⚠️  ข้าม ${key} (ไม่มีค่า)`);
     continue;
   }

@@ -19,6 +19,26 @@ export function formatThaiDate(dateString: string) {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
+/** Parse record start/end dates for sorting (supports YYYY-MM-DD and DD/MM/YYYY). */
+export function parseRecordDate(dateString: string): number {
+  if (!dateString) return 0;
+  const value = dateString.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(value).getTime();
+  }
+
+  const thaiSlash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (thaiSlash) {
+    let year = Number(thaiSlash[3]);
+    if (year > 2400) year -= 543;
+    const iso = `${year}-${String(thaiSlash[2]).padStart(2, "0")}-${String(thaiSlash[1]).padStart(2, "0")}`;
+    return new Date(iso).getTime();
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
 export function compressImageFile(
   file: File,
   quality = 0.7,
