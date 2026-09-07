@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { AwardRecord, SystemSettings } from "@/lib/types";
+import type { AwardRecord, Student, SystemSettings, Teacher } from "@/lib/types";
 import { formatThaiDate, parseRecordDate } from "@/lib/utils";
 
 type Props = {
   records: AwardRecord[];
   settings: SystemSettings;
+  students: Student[];
+  teachers: Teacher[];
 };
 
-export function ShowcaseView({ records, settings }: Props) {
+export function ShowcaseView({ records, settings, students, teachers }: Props) {
   const [area, setArea] = useState("");
   const [year, setYear] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -25,31 +27,82 @@ export function ShowcaseView({ records, settings }: Props) {
       .sort((a, b) => parseRecordDate(b.startDate) - parseRecordDate(a.startDate));
   }, [records, area, year]);
 
-  const highLevels = settings.HighStatsLevels?.length
-    ? settings.HighStatsLevels
-    : ["ระดับชาติ", "ระดับนานาชาติ"];
+  const awardLevels = settings.Level?.length
+    ? settings.Level
+    : ["ระดับเขตพื้นที่", "ระดับจังหวัด", "ระดับภาค", "ระดับชาติ", "ระดับนานาชาติ"];
 
   const uniqueStudents = new Set<string>();
   const uniqueTeachers = new Set<string>();
-  let highCount = 0;
+  const levelCounts: Record<string, number> = {};
   for (const rec of records) {
     rec.students?.forEach((s) => s.name && uniqueStudents.add(s.name.trim()));
     rec.teachers?.forEach((t) => t && uniqueTeachers.add(t.trim()));
-    if (highLevels.includes(rec.level)) highCount += 1;
+    if (rec.level) levelCounts[rec.level] = (levelCounts[rec.level] || 0) + 1;
   }
+  const extraLevels = Object.keys(levelCounts).filter((level) => !awardLevels.includes(level));
+  const levelRows = [...awardLevels, ...extraLevels];
+
+  const competingStudents = countRosterMatches(
+    uniqueStudents,
+    students.map((s) => [`${s.prefix}${s.fullName} (${s.className})`, `${s.prefix}${s.fullName}`, s.fullName]),
+  );
+  const competingTeachers = countRosterMatches(
+    uniqueTeachers,
+    teachers.map((t) => [`${t.prefix}${t.fullName} (${t.learningArea})`, `${t.prefix}${t.fullName}`, t.fullName]),
+  );
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi icon="🏆" label="ผลงานความสำเร็จ" value={records.length} unit="รายการ" />
-        <Kpi icon="🎓" label="นักเรียนที่รับรางวัล" value={uniqueStudents.size} unit="คน (ไม่ซ้ำ)" />
-        <Kpi icon="👨‍🏫" label="ครูฝึกสอน/ผู้ควบคุม" value={uniqueTeachers.size} unit="คน (ไม่ซ้ำ)" />
-        <Kpi
-          icon="🌏"
-          label={`ผลงาน ${highLevels.join("/")}`}
-          value={highCount}
-          unit="รายการ"
-        />
+      <div className="space-y-4">
+        <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div>
+              <div className="text-xs font-semibold text-slate-400">ผลงานตามระดับการแข่งขัน</div>
+              <div>
+                <span className="text-2xl font-bold text-slate-800">{records.length}</span>{" "}
+                <span className="text-xs text-slate-400">รายการทั้งหมด</span>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {levelRows.map((level) => {
+              const count = levelCounts[level] || 0;
+              const percent = percentOf(count, records.length);
+              return (
+                <div
+                  key={level}
+                  className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-3 text-center"
+                >
+                  <div className="text-[11px] font-semibold text-slate-500 leading-snug">
+                    {level.replace(/^ระดับ/, "")}
+                  </div>
+                  <div className="text-2xl font-bold text-slate-800 mt-1">{count}</div>
+                  <div className="text-[11px] font-bold text-emerald-700">
+                    {percent != null ? `${percent}%` : "0%"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Kpi
+            icon="🎓"
+            label="นักเรียนที่ไปแข่ง"
+            value={uniqueStudents.size}
+            unit="คน (ไม่ซ้ำ)"
+            percent={percentOf(competingStudents, students.length)}
+            percentHint={students.length ? `จากนักเรียนทั้งหมด ${students.length} คน` : undefined}
+          />
+          <Kpi
+            icon="👨‍🏫"
+            label="ครูที่ไปแข่ง"
+            value={uniqueTeachers.size}
+            unit="คน (ไม่ซ้ำ)"
+            percent={percentOf(competingTeachers, teachers.length)}
+            percentHint={teachers.length ? `จากครูทั้งหมด ${teachers.length} คน` : undefined}
+          />
+        </div>
       </div>
 
       <div className="text-center py-2">
@@ -232,26 +285,61 @@ export function ShowcaseView({ records, settings }: Props) {
   );
 }
 
+function normalizeName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function countRosterMatches(entries: Set<string>, rosterLabels: string[][]) {
+  const names = [...entries].map(normalizeName);
+  return rosterLabels.filter((labels) =>
+    labels.some((label) => {
+      const key = normalizeName(label);
+      if (!key) return false;
+      return names.some((name) => name === key || name.includes(key));
+    }),
+  ).length;
+}
+
+function percentOf(part: number, total: number) {
+  if (!total) return null;
+  const value = Math.min(100, (part / total) * 100);
+  return value % 1 === 0 ? `${value}` : value.toFixed(1);
+}
+
 function Kpi({
   icon,
   label,
   value,
   unit,
+  percent,
+  percentHint,
 }: {
   icon: string;
   label: string;
   value: number;
   unit: string;
+  percent?: string | null;
+  percentHint?: string;
 }) {
   return (
     <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
       <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-xl">
         {icon}
       </div>
-      <div>
+      <div className="min-w-0">
         <span className="text-xs font-semibold text-slate-400 block">{label}</span>
-        <span className="text-2xl font-bold text-slate-800">{value}</span>{" "}
-        <span className="text-xs text-slate-400">{unit}</span>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span>
+            <span className="text-2xl font-bold text-slate-800">{value}</span>{" "}
+            <span className="text-xs text-slate-400">{unit}</span>
+          </span>
+          {percent != null ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-bold text-emerald-700">
+              {percent}%
+            </span>
+          ) : null}
+        </div>
+        {percentHint ? <span className="text-[11px] text-slate-400">{percentHint}</span> : null}
       </div>
     </div>
   );

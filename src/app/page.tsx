@@ -1,11 +1,16 @@
 import { ShowcaseView } from "@/components/ShowcaseView";
-import { getRecords, getSettings } from "@/lib/data";
+import { getRecords, getSettings, getStudents, getTeachers } from "@/lib/data";
 import { isMockMode } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [records, settings] = await Promise.all([getRecords(), getSettings()]);
+  const [records, settings, students, teachers] = await Promise.all([
+    getRecords(),
+    getSettings(),
+    getStudents(),
+    getTeachers(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -16,7 +21,12 @@ export default async function HomePage() {
           <code className="font-mono">USE_MOCK=false</code>
         </div>
       ) : null}
-      <ShowcaseView records={records} settings={settings} />
+      <ShowcaseView
+        records={records}
+        settings={settings}
+        students={students}
+        teachers={teachers}
+      />
     </div>
   );
 }
