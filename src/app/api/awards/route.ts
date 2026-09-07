@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getRecords } from "@/lib/data";
+import { getRecordById, getRecords, saveRecord } from "@/lib/data";
 import { getClientIp } from "@/lib/utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/auth";
-import { saveRecord } from "@/lib/data";
 import type { SaveAwardInput } from "@/lib/types";
 
 export async function GET(request: Request) {
@@ -31,10 +30,8 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as SaveAwardInput;
-    if (!body.id) {
-      // public create — strip id just in case
-      delete body.id;
-    } else {
+    const existing = body.id ? await getRecordById(body.id) : null;
+    if (existing) {
       const admin = await requireAdmin();
       if (!admin) {
         return NextResponse.json(
@@ -44,13 +41,12 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!body.images || body.images.length < 3) {
-      if (!body.id) {
-        return NextResponse.json(
-          { success: false, message: "กรุณาอัปโหลดรูปภาพกิจกรรมอย่างน้อย 3 รูป" },
-          { status: 400 },
-        );
-      }
+    const imageCount = body.imageUrls?.length || body.images?.length || 0;
+    if (!existing && imageCount < 3) {
+      return NextResponse.json(
+        { success: false, message: "กรุณาอัปโหลดรูปภาพกิจกรรมอย่างน้อย 3 รูป" },
+        { status: 400 },
+      );
     }
 
     const record = await saveRecord(body);

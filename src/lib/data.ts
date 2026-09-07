@@ -4,6 +4,8 @@ import {
   findEventFolderForRecord,
   getOrCreateEventFolder,
   trashFilesByPrefix,
+  trashFilesByUrls,
+  uploadBufferToDrive,
   uploadImageToDrive,
 } from "./drive";
 import { getSheetId, getSheetsClient, isMockMode } from "./google";
@@ -331,21 +333,61 @@ async function findRecordRow(id: string) {
   return null;
 }
 
+export async function prepareEventUpload(input: {
+  startDate: string;
+  activityName: string;
+  id?: string;
+}) {
+  const id = input.id || `REC${Date.now()}`;
+  if (isMockMode()) return { id, folderId: "mock" };
+
+  let existingFolderId: string | null = null;
+  if (input.id) {
+    const found = await findRecordRow(input.id);
+    if (found) {
+      existingFolderId = await findEventFolderForRecord(found.record);
+    }
+  }
+
+  const folderId = await getOrCreateEventFolder(
+    input.startDate,
+    input.activityName,
+    existingFolderId,
+  );
+  return { id, folderId };
+}
+
+export async function uploadEventImage(input: {
+  folderId: string;
+  filename: string;
+  buffer: Buffer;
+  mimeType: string;
+}) {
+  if (isMockMode()) {
+    return `https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1600&q=90&mock=${encodeURIComponent(input.filename)}`;
+  }
+  return uploadBufferToDrive(input.folderId, input.filename, input.buffer, input.mimeType);
+}
+
 export async function saveRecord(input: SaveAwardInput) {
   if (isMockMode()) return mockStore.saveRecord(input);
 
   const sheets = getSheetsClient();
-  const isUpdate = Boolean(input.id);
   let id = input.id || `REC${Date.now()}`;
   let existing: AwardRecord | null = null;
   let rowNumber: number | null = null;
+  let isUpdate = false;
 
-  if (isUpdate && input.id) {
+  if (input.id) {
     const found = await findRecordRow(input.id);
-    if (!found) throw new Error("ไม่พบรายการที่ต้องการแก้ไข");
-    existing = found.record;
-    rowNumber = found.rowNumber;
-    id = input.id;
+    if (found) {
+      isUpdate = true;
+      existing = found.record;
+      rowNumber = found.rowNumber;
+      id = input.id;
+    } else {
+      id = input.id;
+    }
   }
 
   let folderId: string | null = null;
@@ -355,7 +397,14 @@ export async function saveRecord(input: SaveAwardInput) {
   folderId = await getOrCreateEventFolder(input.startDate, input.activityName, folderId);
 
   let imageUrls = existing?.imageUrls || [];
-  if (input.images && input.images.length > 0) {
+  if (input.imageUrls && input.imageUrls.length > 0) {
+    if (existing?.imageUrls?.length) {
+      const next = new Set(input.imageUrls);
+      const removed = existing.imageUrls.filter((url) => !next.has(url));
+      if (removed.length) await trashFilesByUrls(removed);
+    }
+    imageUrls = input.imageUrls;
+  } else if (input.images && input.images.length > 0) {
     await trashFilesByPrefix(folderId, `${id}_img_`);
     imageUrls = [];
     for (let i = 0; i < input.images.length; i++) {
@@ -367,7 +416,12 @@ export async function saveRecord(input: SaveAwardInput) {
   }
 
   let certUrl = existing?.certUrl || "";
-  if (input.certificate?.base64) {
+  if (input.certUrl) {
+    if (existing?.certUrl && existing.certUrl !== input.certUrl) {
+      await trashFilesByUrls([existing.certUrl]);
+    }
+    certUrl = input.certUrl;
+  } else if (input.certificate?.base64) {
     await trashFilesByPrefix(folderId, `${id}_cert`);
     const filename = `${id}_cert_${Date.now()}.jpg`;
     certUrl = await uploadImageToDrive(folderId, filename, input.certificate.base64);

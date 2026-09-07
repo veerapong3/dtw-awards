@@ -283,13 +283,13 @@ function parseBase64(dataUrl: string) {
   };
 }
 
-export async function uploadImageToDrive(
+export async function uploadBufferToDrive(
   folderId: string,
   filename: string,
-  base64Data: string,
+  buffer: Buffer,
+  mimeType: string,
 ) {
   const drive = getDriveClient();
-  const { mimeType, buffer } = parseBase64(base64Data);
 
   try {
     const created = await drive.files.create({
@@ -317,8 +317,33 @@ export async function uploadImageToDrive(
       supportsAllDrives: true,
     });
 
+    if (mimeType === "application/pdf") {
+      return `https://drive.google.com/file/d/${fileId}/view`;
+    }
     return `https://lh3.googleusercontent.com/d/${fileId}`;
   } catch (error) {
     throw new Error(explainDriveUploadError(error));
+  }
+}
+
+export async function uploadImageToDrive(
+  folderId: string,
+  filename: string,
+  base64Data: string,
+) {
+  const { mimeType, buffer } = parseBase64(base64Data);
+  return uploadBufferToDrive(folderId, filename, buffer, mimeType);
+}
+
+export async function trashFilesByUrls(urls: string[]) {
+  const drive = getDriveClient();
+  for (const url of urls) {
+    const fileId = extractDriveFileId(url);
+    if (!fileId) continue;
+    await drive.files.update({
+      fileId,
+      requestBody: { trashed: true },
+      supportsAllDrives: true,
+    });
   }
 }

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AwardRecord, Student, SystemSettings, Teacher } from "@/lib/types";
 import { PROVINCES } from "@/lib/types";
-import { compressImageFile } from "@/lib/utils";
+import { MAX_ACTIVITY_IMAGES, extensionForMime, prepareCertificateFile, prepareImageFile } from "@/lib/utils";
 
 type Props = {
   settings: SystemSettings;
@@ -46,10 +46,10 @@ export function AwardForm({
   );
 
   useEffect(() => {
-    if (!message) return;
+    if (!message || busy) return;
     const t = setTimeout(() => setMessage(null), 5000);
     return () => clearTimeout(t);
-  }, [message]);
+  }, [message, busy]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -67,19 +67,77 @@ export function AwardForm({
         setBusy(false);
         return;
       }
-
-      const images = [];
-      for (const file of files) {
-        images.push(await compressImageFile(file));
+      if (files.length > MAX_ACTIVITY_IMAGES) {
+        setMessage({ type: "err", text: `อัปโหลดรูปภาพกิจกรรมได้ไม่เกิน ${MAX_ACTIVITY_IMAGES} รูป` });
+        setBusy(false);
+        return;
       }
 
-      let certificate = null;
+      const preparedImages: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        setMessage({ type: "ok", text: `กำลังเตรียมรูปภาพ ${i + 1}/${files.length}...` });
+        preparedImages.push(await prepareImageFile(files[i]));
+      }
+
+      let preparedCert: File | null = null;
       if (certInput.files?.[0]) {
-        certificate = await compressImageFile(certInput.files[0], 0.8, 1200);
+        setMessage({ type: "ok", text: "กำลังเตรียมไฟล์เกียรติบัตร..." });
+        preparedCert = await prepareCertificateFile(certInput.files[0]);
+      }
+
+      let imageUrls: string[] | undefined;
+      let certUrl: string | undefined;
+      let recordId = initial?.id;
+
+      if (preparedImages.length || preparedCert) {
+        setMessage({ type: "ok", text: "กำลังเตรียมอัปโหลด..." });
+        const prepRes = await fetch("/api/awards/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: initial?.id,
+            startDate,
+            activityName,
+          }),
+        });
+        const prep = await prepRes.json();
+        if (!prepRes.ok || !prep.success) {
+          throw new Error(prep.message || "เตรียมอัปโหลดไม่สำเร็จ");
+        }
+        recordId = prep.id;
+
+        imageUrls = [];
+        for (let i = 0; i < preparedImages.length; i++) {
+          setMessage({ type: "ok", text: `กำลังอัปโหลดรูปภาพ ${i + 1}/${preparedImages.length}...` });
+          const file = preparedImages[i];
+          imageUrls.push(
+            await uploadPreparedFile(
+              prep.folderId,
+              `${prep.id}_img_${i}_${Date.now()}${extensionForMime(file.type, file.name)}`,
+              file,
+            ),
+          );
+        }
+
+        if (preparedCert) {
+          setMessage({ type: "ok", text: "กำลังอัปโหลดเกียรติบัตร..." });
+          certUrl = await uploadPreparedFile(
+            prep.folderId,
+            `${prep.id}_cert_${Date.now()}${extensionForMime(preparedCert.type, preparedCert.name)}`,
+            preparedCert,
+            "certificate",
+          );
+        }
+
+        if (!initial && imageUrls.length < 3) {
+          throw new Error("กรุณาอัปโหลดรูปภาพกิจกรรมอย่างน้อย 3 รูป");
+        }
+
+        setMessage({ type: "ok", text: "กำลังบันทึกข้อมูล..." });
       }
 
       const payload = {
-        id: initial?.id,
+        id: recordId,
         academicYear,
         term,
         learningArea,
@@ -91,8 +149,8 @@ export function AwardForm({
         province,
         students: studentRows.filter((s) => s.name.trim()),
         teachers: teacherRows.filter((t) => t.trim()),
-        images,
-        certificate,
+        imageUrls,
+        certUrl,
       };
 
       const url = initial ? `/api/awards/${initial.id}` : "/api/awards";
@@ -387,14 +445,23 @@ export function AwardForm({
             className="w-full text-sm"
           />
           <span className="text-xs text-slate-400 mt-1 block">
-            ระบบจะบีบอัดรูปก่อนอัปโหลด {initial ? "(แก้ไขไม่บังคับแนบรูปใหม่)" : ""}
+            ระบบเก็บรายละเอียดต้นฉบับให้มากที่สุด และย่อเฉพาะเมื่อไฟล์ใหญ่เกินกว่าที่อัปโหลดได้
+            {initial ? " — แก้ไขไม่บังคับแนบรูปใหม่" : ""}
           </span>
         </div>
         <div className="p-4 border border-dashed border-slate-300 bg-slate-50/50 rounded-lg">
           <label className="block text-sm font-semibold text-slate-700 mb-1">
-            ไฟล์รูปเกียรติบัตร (ถ้ามี)
+            ไฟล์เกียรติบัตร (ถ้ามี)
           </label>
-          <input name="certificate" type="file" accept="image/*" className="w-full text-sm" />
+          <input
+            name="certificate"
+            type="file"
+            accept="image/*,application/pdf"
+            className="w-full text-sm"
+          />
+          <span className="text-xs text-slate-400 mt-1 block">
+            รองรับไฟล์รูปหรือ PDF ไม่เกิน 3.5MB
+          </span>
         </div>
       </div>
 
@@ -461,6 +528,25 @@ function Select({
       </select>
     </Field>
   );
+}
+
+async function uploadPreparedFile(
+  folderId: string,
+  filename: string,
+  file: File,
+  kind: "image" | "certificate" = "image",
+) {
+  const body = new FormData();
+  body.append("folderId", folderId);
+  body.append("filename", filename);
+  body.append("kind", kind);
+  body.append("file", file);
+  const res = await fetch("/api/uploads", { method: "POST", body });
+  const data = await res.json();
+  if (!res.ok || !data.url) {
+    throw new Error(data.message || "อัปโหลดรูปไม่สำเร็จ");
+  }
+  return data.url as string;
 }
 
 function toInputDate(value?: string) {

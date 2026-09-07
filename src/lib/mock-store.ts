@@ -152,20 +152,22 @@ export const mockStore = {
   },
 
   async saveRecord(input: SaveAwardInput): Promise<AwardRecord> {
-    const isUpdate = Boolean(input.id);
     const id = input.id || `REC${Date.now()}`;
     const existing = records.find((r) => r.id === id);
 
     const imageUrls =
-      input.images && input.images.length > 0
-        ? input.images.map(
-            (_, i) =>
-              `https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&q=80&mock=${id}-${i}`,
-          )
-        : existing?.imageUrls || [];
+      input.imageUrls && input.imageUrls.length > 0
+        ? input.imageUrls
+        : input.images && input.images.length > 0
+          ? input.images.map(
+              (_, i) =>
+                `https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&q=80&mock=${id}-${i}`,
+            )
+          : existing?.imageUrls || [];
 
-    const certUrl =
-      input.certificate?.base64
+    const certUrl = input.certUrl
+      ? input.certUrl
+      : input.certificate?.base64
         ? `https://images.unsplash.com/photo-1589330694653-ded6df03f754?w=800&q=80&cert=${id}`
         : existing?.certUrl || "";
 
@@ -187,7 +189,7 @@ export const mockStore = {
       certUrl,
     };
 
-    if (isUpdate) {
+    if (existing) {
       records = records.map((r) => (r.id === id ? row : r));
     } else {
       records = [row, ...records];
