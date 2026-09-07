@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AwardRecord, Student, SystemSettings, Teacher } from "@/lib/types";
 import { formatThaiDate, parseRecordDate } from "@/lib/utils";
 
@@ -11,10 +11,13 @@ type Props = {
   teachers: Teacher[];
 };
 
+const PAGE_SIZE = 9;
+
 export function ShowcaseView({ records, settings, students, teachers }: Props) {
   const [area, setArea] = useState("");
   const [year, setYear] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("");
+  const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [gallery, setGallery] = useState<AwardRecord | null>(null);
 
@@ -28,6 +31,22 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
       })
       .sort((a, b) => parseRecordDate(b.startDate) - parseRecordDate(a.startDate));
   }, [records, area, year, selectedLevel]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [area, year, selectedLevel]);
+
+  function goToPage(next: number) {
+    const safe = Math.min(totalPages, Math.max(1, next));
+    setPage(safe);
+    requestAnimationFrame(() => {
+      document.getElementById("award-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   function selectLevel(next: string) {
     setSelectedLevel((current) => (current === next ? "" : next));
@@ -243,6 +262,9 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
 
       <p className="text-sm text-slate-500">
         พบ {filtered.length} รายการ
+        {filtered.length > 0
+          ? ` · หน้า ${currentPage}/${totalPages} · แสดง ${paged.length} จาก ${filtered.length}`
+          : ""}
         {selectedLevel ? ` · ${selectedLevel}` : ""}
       </p>
 
@@ -250,7 +272,7 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
         <div className="text-center py-16 text-slate-400">ยังไม่พบประวัติผลงานในระบบ</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((rec) => {
+          {paged.map((rec) => {
             const cover = rec.imageUrls[0] || "/placeholder-award.svg";
             const limit = 3;
             const showAll = expanded[rec.id];
@@ -342,6 +364,10 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
           })}
         </div>
       )}
+
+      {filtered.length > PAGE_SIZE ? (
+        <Pagination page={currentPage} totalPages={totalPages} onChange={goToPage} />
+      ) : null}
 
       {gallery ? (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -511,5 +537,69 @@ function Kpi({
         {percentHint ? <span className="text-[11px] text-slate-400">{percentHint}</span> : null}
       </div>
     </div>
+  );
+}
+
+function pageItems(current: number, total: number) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: Array<number | "ellipsis"> = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) items.push("ellipsis");
+  for (let i = start; i <= end; i += 1) items.push(i);
+  if (end < total - 1) items.push("ellipsis");
+  items.push(total);
+  return items;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  return (
+    <nav className="flex flex-wrap items-center justify-center gap-2 pt-2" aria-label="แบ่งหน้า">
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+      >
+        ก่อนหน้า
+      </button>
+      {pageItems(page, totalPages).map((item, index) =>
+        item === "ellipsis" ? (
+          <span key={`e-${index}`} className="px-1 text-slate-400">
+            …
+          </span>
+        ) : (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onChange(item)}
+            aria-current={item === page ? "page" : undefined}
+            className={`min-w-10 rounded-lg px-3 py-2 text-sm font-bold ${
+              item === page
+                ? "bg-emerald-700 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {item}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+      >
+        ถัดไป
+      </button>
+    </nav>
   );
 }
