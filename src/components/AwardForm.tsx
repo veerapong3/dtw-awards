@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AwardRecord, Student, SystemSettings, Teacher } from "@/lib/types";
 import { PROVINCES } from "@/lib/types";
-import { MAX_ACTIVITY_IMAGES, extensionForMime, prepareCertificateFile, prepareImageFile } from "@/lib/utils";
+import { MAX_ACTIVITY_IMAGES, canonicalLevel, extensionForMime, prepareCertificateFile, prepareImageFile } from "@/lib/utils";
 
 type Props = {
   settings: SystemSettings;
@@ -31,7 +31,7 @@ export function AwardForm({
   const [term, setTerm] = useState(initial?.term || "");
   const [learningArea, setLearningArea] = useState(initial?.learningArea || "");
   const [activityName, setActivityName] = useState(initial?.activityName || "");
-  const [level, setLevel] = useState(initial?.level || "");
+  const [level, setLevel] = useState(canonicalLevel(initial?.level || ""));
   const [startDate, setStartDate] = useState(toInputDate(initial?.startDate));
   const [endDate, setEndDate] = useState(toInputDate(initial?.endDate));
   const [location, setLocation] = useState(initial?.location || "");

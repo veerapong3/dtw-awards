@@ -1,5 +1,5 @@
 import type { AwardRecord } from "./types";
-import { formatThaiDate } from "./utils";
+import { canonicalLevel, formatThaiDate } from "./utils";
 
 export type ReportFilters = {
   academicYear?: string;
@@ -15,7 +15,7 @@ export function filterRecords(records: AwardRecord[], filters: ReportFilters) {
     if (filters.academicYear && r.academicYear !== filters.academicYear) return false;
     if (filters.term && r.term !== filters.term) return false;
     if (filters.learningArea && r.learningArea !== filters.learningArea) return false;
-    if (filters.level && r.level !== filters.level) return false;
+    if (filters.level && canonicalLevel(r.level) !== filters.level) return false;
     return true;
   });
 }
@@ -26,7 +26,7 @@ export function buildActivityRows(records: AwardRecord[]) {
     ภาคเรียน: r.term,
     กลุ่มสาระ: r.learningArea,
     ชื่อกิจกรรม: r.activityName,
-    ระดับการแข่งขัน: r.level,
+    ระดับการแข่งขัน: canonicalLevel(r.level),
     วันที่เริ่ม: formatThaiDate(r.startDate),
     วันที่สิ้นสุด: formatThaiDate(r.endDate),
     สถานที่: r.location,
@@ -62,7 +62,7 @@ export function buildStudentRows(records: AwardRecord[]) {
         ภาคเรียน: r.term,
         กลุ่มสาระ: r.learningArea,
         ชื่อกิจกรรม: r.activityName,
-        ระดับการแข่งขัน: r.level,
+        ระดับการแข่งขัน: canonicalLevel(r.level),
         วันที่เริ่ม: formatThaiDate(r.startDate),
         จังหวัด: r.province,
         ครูผู้ฝึกสอน: teachers,
@@ -82,7 +82,7 @@ export function buildSummaryRows(records: AwardRecord[]) {
 
   for (const r of records) {
     byArea[r.learningArea] = (byArea[r.learningArea] || 0) + 1;
-    byLevel[r.level] = (byLevel[r.level] || 0) + 1;
+    byLevel[canonicalLevel(r.level)] = (byLevel[canonicalLevel(r.level)] || 0) + 1;
     byYear[r.academicYear] = (byYear[r.academicYear] || 0) + 1;
     r.students?.forEach((s) => s.name && studentSet.add(s.name.trim()));
     r.teachers?.forEach((t) => t && teacherSet.add(t.trim()));

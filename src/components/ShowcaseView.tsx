@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AwardRecord, Student, SystemSettings, Teacher } from "@/lib/types";
-import { formatThaiDate, parseRecordDate } from "@/lib/utils";
+import { canonicalLevel, formatThaiDate, parseRecordDate } from "@/lib/utils";
 
 type Props = {
   records: AwardRecord[];
@@ -26,7 +26,7 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
       .filter((r) => {
         if (area && r.learningArea !== area) return false;
         if (year && r.academicYear !== year) return false;
-        if (selectedLevel && r.level !== selectedLevel) return false;
+        if (selectedLevel && canonicalLevel(r.level) !== selectedLevel) return false;
         return true;
       })
       .sort((a, b) => parseRecordDate(b.startDate) - parseRecordDate(a.startDate));
@@ -57,7 +57,7 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
 
   const awardLevels = settings.Level?.length
     ? settings.Level
-    : ["ระดับเขตพื้นที่", "ระดับจังหวัด", "ระดับภาค", "ระดับชาติ", "ระดับนานาชาติ"];
+    : ["ระดับเขตพื้นที่", "ระดับจังหวัด", "ระดับภาค", "ระดับชาติ/ประเทศ", "ระดับนานาชาติ"];
 
   const uniqueStudents = new Set<string>();
   const uniqueTeachers = new Set<string>();
@@ -65,7 +65,10 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
   for (const rec of records) {
     rec.students?.forEach((s) => s.name && uniqueStudents.add(s.name.trim()));
     rec.teachers?.forEach((t) => t && uniqueTeachers.add(t.trim()));
-    if (rec.level) levelCounts[rec.level] = (levelCounts[rec.level] || 0) + 1;
+    if (rec.level) {
+      const key = canonicalLevel(rec.level);
+      levelCounts[key] = (levelCounts[key] || 0) + 1;
+    }
   }
   const extraLevels = Object.keys(levelCounts).filter((level) => !awardLevels.includes(level));
   const levelRows = [...awardLevels, ...extraLevels];
@@ -292,9 +295,9 @@ export function ShowcaseView({ records, settings, students, teachers }: Props) {
                     className="w-full h-full object-cover"
                   />
                   <span
-                    className={`absolute top-4 right-4 text-[11px] font-bold px-3 py-1 rounded-full shadow-sm ${levelTheme(rec.level).badge}`}
+                    className={`absolute top-4 right-4 text-[11px] font-bold px-3 py-1 rounded-full shadow-sm ${levelTheme(canonicalLevel(rec.level)).badge}`}
                   >
-                    {rec.level}
+                    {canonicalLevel(rec.level)}
                   </span>
                 </div>
                 <div className="p-6 space-y-2.5 flex-grow">

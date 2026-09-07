@@ -1,3 +1,7 @@
+export function canonicalLevel(level: string) {
+  return level === "ระดับชาติ" ? "ระดับชาติ/ประเทศ" : level;
+}
+
 export function formatThaiDate(dateString: string) {
   if (!dateString) return "";
   const d = new Date(dateString);

@@ -12,6 +12,7 @@ import {
 } from "chart.js";
 import { Bar, Pie } from "react-chartjs-2";
 import type { AwardRecord } from "@/lib/types";
+import { canonicalLevel } from "@/lib/utils";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -27,7 +28,8 @@ export function StatsView({ records }: { records: AwardRecord[] }) {
   const levelCounts = useMemo(() => {
     const map: Record<string, number> = {};
     records.forEach((r) => {
-      map[r.level] = (map[r.level] || 0) + 1;
+      const key = canonicalLevel(r.level);
+      map[key] = (map[key] || 0) + 1;
     });
     return map;
   }, [records]);

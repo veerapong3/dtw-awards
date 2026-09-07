@@ -21,6 +21,7 @@ import type {
   Teacher,
 } from "./types";
 import { SHEET_NAMES } from "./types";
+import { canonicalLevel } from "./utils";
 import bcrypt from "bcryptjs";
 
 function cell(value: unknown) {
@@ -113,7 +114,9 @@ export async function getSettings(bypassCache = false): Promise<SystemSettings> 
   for (const row of rows) {
     const type = row[0] as keyof SystemSettings;
     const value = row[1];
-    if (settings[type] && value) settings[type].push(value);
+    if (settings[type] && value) {
+      settings[type].push(type === "Level" || type === "HighStatsLevels" ? canonicalLevel(value) : value);
+    }
   }
 
   cacheSet(cacheKey, settings, 300);
