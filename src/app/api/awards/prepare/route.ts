@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const ip = getClientIp(request.headers);
-  const limited = rateLimit(`submit-prepare:${ip}`, 8, 60 * 60 * 1000);
+  const limited = rateLimit(`submit-prepare:${ip}`, 20, 60 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { success: false, message: "ส่งข้อมูลบ่อยเกินไป กรุณาลองใหม่ภายหลัง" },
@@ -20,13 +20,6 @@ export async function POST(request: Request) {
       activityName?: string;
       id?: string;
     };
-
-    if (!body.startDate || !body.activityName) {
-      return NextResponse.json(
-        { success: false, message: "กรุณาระบุวันที่และชื่อกิจกรรม" },
-        { status: 400 },
-      );
-    }
 
     if (body.id) {
       const existing = await getRecordById(body.id);

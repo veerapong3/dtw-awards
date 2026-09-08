@@ -79,6 +79,7 @@ export type SaveAwardInput = {
   certificate?: ImagePayload | null;
   imageUrls?: string[];
   certUrl?: string;
+  folderId?: string;
 };
 
 export type SettingItem = {

@@ -337,11 +337,13 @@ async function findRecordRow(id: string) {
 }
 
 export async function prepareEventUpload(input: {
-  startDate: string;
-  activityName: string;
+  startDate?: string;
+  activityName?: string;
   id?: string;
 }) {
   const id = input.id || `REC${Date.now()}`;
+  const startDate = input.startDate || new Date().toISOString().slice(0, 10);
+  const activityName = input.activityName?.trim() || `รอจัดเก็บ ${id}`;
   if (isMockMode()) return { id, folderId: "mock" };
 
   let existingFolderId: string | null = null;
@@ -353,8 +355,8 @@ export async function prepareEventUpload(input: {
   }
 
   const folderId = await getOrCreateEventFolder(
-    input.startDate,
-    input.activityName,
+    startDate,
+    activityName,
     existingFolderId,
   );
   return { id, folderId };
@@ -393,14 +395,14 @@ export async function saveRecord(input: SaveAwardInput) {
     }
   }
 
-  let folderId: string | null = null;
-  if (existing) {
+  let folderId: string | null = input.folderId || null;
+  if (!folderId && existing) {
     folderId = await findEventFolderForRecord(existing);
   }
   folderId = await getOrCreateEventFolder(input.startDate, input.activityName, folderId);
 
   let imageUrls = existing?.imageUrls || [];
-  if (input.imageUrls && input.imageUrls.length > 0) {
+  if (Array.isArray(input.imageUrls)) {
     if (existing?.imageUrls?.length) {
       const next = new Set(input.imageUrls);
       const removed = existing.imageUrls.filter((url) => !next.has(url));
@@ -419,7 +421,7 @@ export async function saveRecord(input: SaveAwardInput) {
   }
 
   let certUrl = existing?.certUrl || "";
-  if (input.certUrl) {
+  if (input.certUrl !== undefined) {
     if (existing?.certUrl && existing.certUrl !== input.certUrl) {
       await trashFilesByUrls([existing.certUrl]);
     }
